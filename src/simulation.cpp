@@ -64,48 +64,114 @@ void Simulation::run(const string& filename) {
 
 void Simulation::handle_thread_arrived(const Event* event) {
   // TODO: handle this event properly (feel free to modify code structure, tho)
+
+  // Set ready enqueue
+  // if(Processor idle) {
+  //  DISPATCHER_INVOKED;
+  //}
+  //else {
+  // Thread Preempted
+  //}
+
   cout << "event: THREAD_ARRIVED" << endl;
 }
 
 
 void Simulation::handle_thread_dispatch_completed(const Event* event) {
   // TODO: handle this event properly (feel free to modify code structure, tho)
-  cout << "event: PROCESS_DISPATCH_COMPLETED" << endl;
+
+  // Set running
+  // Set last thread = current thread;
+  // if (thread time slice < burst time) {
+  //   THrad preempted;
+  // }
+  // else {
+  //   cput burst completed;
+  // }
+
+  cout << "event: THREAD_DISPATCH_COMPLETED" << endl;
 }
 
 
 void Simulation::handle_process_dispatch_completed(const Event* event) {
   // TODO: handle this event properly (feel free to modify code structure, tho)
-  cout << "event: THREAD_DISPATCH_COMPLETED" << endl;
+
+  // Set running
+  // Set last thread = current thread;
+  // if (thread time slice < burst time) {
+  //   THrad preempted;
+  // }
+  // else {
+  //   cput burst completed;
+  // }
+
+  cout << "event: PROCESS_DISPATCH_COMPLETED" << endl;
 }
 
 
 void Simulation::handle_cpu_burst_completed(const Event* event) {
   // TODO: handle this event properly (feel free to modify code structure, tho)
+
+  // pop burst
+  // unset current thread
+  // dispatcher invoker;
+  // if(last cpu burst) {
+  //   thread competed;
+  // }
+  // else {
+  //   set blocked;
+  //   io burst completed;
+  // }
+
   cout << "event: CPU_BURST_COMPLETED" << endl;
 }
 
 
 void Simulation::handle_io_burst_completed(const Event* event) {
   // TODO: handle this event properly (feel free to modify code structure, tho)
+
+  // set ready enqueu;
+  // pop burst;
+  // dispatcher invoked;
+
   cout << "event: IO_BURST_COMPLETED" << endl;
 }
 
 
 void Simulation::handle_thread_completed(const Event* event) {
   // TODO: handle this event properly (feel free to modify code structure, tho)
+
+  // set exit;
+
   cout << "event: THREAD_COMPLETED" << endl;
 }
 
 
 void Simulation::handle_thread_preempted(const Event* event) {
   // TODO: handle this event properly (feel free to modify code structure, tho)
+
+  // Set ready enqueue
+  //decrese cpu burst
+  // thread dispatcher envoked;
+
   cout << "event: THREAD_PREEMPTED" << endl;
 }
 
 
 void Simulation::handle_dispatcher_invoked(const Event* event) {
   // TODO: handle this event properly (feel free to modify code structure, tho)
+
+  // Get scheduling decision and set current thread
+  // if(made decision) {
+  //   if(process switch){
+  //     thread dispatch completed
+  //   }
+  //   else {
+  //     process dispatch completed
+  //   }
+  // }
+
+
   cout << "event: DISPATCHER_INVOKED" << endl;
 }
 
