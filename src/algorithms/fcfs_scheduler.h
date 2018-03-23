@@ -3,7 +3,7 @@
 #include "types/event.h"
 #include "types/scheduling_decision.h"
 #include "types/thread.h"
-
+#include<queue>
 
 /**
  * Represents a scheduling queue that uses first-come, first-served.
@@ -24,6 +24,6 @@ public:
 
 private:
 
-	size_t size = 0;
+	std::queue<Thread*> q;
   // TODO: add any instance variables you need
 };

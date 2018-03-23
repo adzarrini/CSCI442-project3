@@ -50,10 +50,19 @@ void Simulation::run(const string& filename) {
       handle_dispatcher_invoked(event);
       break;
     }
+    if (event->thread && event->thread->current_state != event->thread->previous_state) {
+      logger.print_state_transition(event, event->thread->previous_state, event->thread->current_state);
+    }
 
+    stats.total_time = event->time;
     // Free the event's memory.
     delete event;
   }
+
+  for(auto entry: processes) {
+    logger.print_process_details(entry.second);
+  }
+  logger.print_statistics(calculate_statistics());
 }
 
 
@@ -73,7 +82,16 @@ void Simulation::handle_thread_arrived(const Event* event) {
   // Thread Preempted
   //}
 
-  cout << "event: THREAD_ARRIVED" << endl;
+  event->thread->set_ready(event->time);
+  scheduler->enqueue(event, event->thread);
+  if(active_thread == nullptr) {
+    add_event(new Event(Event::Type::DISPATCHER_INVOKED, event->time, nullptr));  
+  }
+  // else{
+  //   // Does not need to be implemented for FCFS. 
+  // }
+
+  //cout << "event: THREAD_ARRIVED" << endl;
 }
 
 
@@ -83,13 +101,31 @@ void Simulation::handle_thread_dispatch_completed(const Event* event) {
   // Set running
   // Set last thread = current thread;
   // if (thread time slice < burst time) {
-  //   THrad preempted;
+  //   Thread preempted;
   // }
   // else {
-  //   cput burst completed;
+  //   cpu burst completed;
   // }
 
-  cout << "event: THREAD_DISPATCH_COMPLETED" << endl;
+  event->thread->set_running(event->time);
+
+  int time_slice = event->scheduling_decision->time_slice;
+  int burst_length = event->thread->bursts.front()->length;
+
+  size_t event_time = (time_slice == -1) 
+    ? (event->time+burst_length) 
+    : event->time + time_slice;
+
+  if(time_slice < burst_length) {
+    event->thread->service_time += burst_length;
+    add_event(new Event(Event::Type::CPU_BURST_COMPLETED, event_time, event->thread));
+  }
+  else {
+    add_event(new Event(Event::Type::THREAD_PREEMPTED, event_time, event->thread));
+  }
+
+  
+  //cout << "event: THREAD_DISPATCH_COMPLETED" << endl;
 }
 
 
@@ -105,7 +141,27 @@ void Simulation::handle_process_dispatch_completed(const Event* event) {
   //   cput burst completed;
   // }
 
-  cout << "event: PROCESS_DISPATCH_COMPLETED" << endl;
+  event->thread->set_running(event->time);
+
+  int time_slice = event->scheduling_decision->time_slice;
+  int burst_length = event->thread->bursts.front()->length;
+
+  size_t event_time = (time_slice == -1) 
+    ? (event->time+burst_length) 
+    : event->time + time_slice;
+
+
+
+  if(time_slice < burst_length) {
+    event->thread->service_time += burst_length;
+    add_event(new Event(Event::Type::CPU_BURST_COMPLETED, event_time, event->thread));
+  }
+  else {
+    add_event(new Event(Event::Type::THREAD_PREEMPTED, event_time, event->thread));
+  }
+
+
+  cout << "event: THREAD_PROCESS_COMPLETED" << endl;
 }
 
 
@@ -123,6 +179,22 @@ void Simulation::handle_cpu_burst_completed(const Event* event) {
   //   io burst completed;
   // }
 
+  event->thread->bursts.pop();
+  prev_thread = active_thread;
+  active_thread = nullptr;
+
+  if(event->thread->bursts.empty()){
+    add_event(new Event(Event::Type::THREAD_COMPLETED, event->time,event->thread));
+  }
+  else{
+    event->thread->set_blocked(event->time);
+
+    Burst* temp = event->thread->bursts.front();
+    event->thread->io_time+=temp->length;
+    add_event(new Event(Event::Type::IO_BURST_COMPLETED,event->time+temp->length,event->thread));
+  }
+  add_event(new Event(Event::Type::DISPATCHER_INVOKED, event->time, event->thread));
+
   cout << "event: CPU_BURST_COMPLETED" << endl;
 }
 
@@ -130,9 +202,17 @@ void Simulation::handle_cpu_burst_completed(const Event* event) {
 void Simulation::handle_io_burst_completed(const Event* event) {
   // TODO: handle this event properly (feel free to modify code structure, tho)
 
-  // set ready enqueu;
+  // set ready 
+  // enqueu;
   // pop burst;
   // dispatcher invoked;
+
+  event->thread->set_ready(event->time);
+  scheduler->enqueue(event, event->thread);
+  event->thread->bursts.pop();
+  if(active_thread == NULL) {
+    add_event(new Event(Event::Type::DISPATCHER_INVOKED, event->time, event->thread));
+  }
 
   cout << "event: IO_BURST_COMPLETED" << endl;
 }
@@ -142,6 +222,9 @@ void Simulation::handle_thread_completed(const Event* event) {
   // TODO: handle this event properly (feel free to modify code structure, tho)
 
   // set exit;
+  event->thread->set_exit(event->time);
+
+  //add_event(new Event(Event::DISPATCHER_INVOKED, event->time, nullptr));
 
   cout << "event: THREAD_COMPLETED" << endl;
 }
@@ -153,6 +236,12 @@ void Simulation::handle_thread_preempted(const Event* event) {
   // Set ready enqueue
   //decrese cpu burst
   // thread dispatcher envoked;
+
+  event->thread->set_ready(event->time);
+
+  scheduler->enqueue(event, event->thread);
+
+  add_event(new Event(Event::DISPATCHER_INVOKED, event->time, nullptr));
 
   cout << "event: THREAD_PREEMPTED" << endl;
 }
@@ -171,6 +260,25 @@ void Simulation::handle_dispatcher_invoked(const Event* event) {
   //   }
   // }
 
+  if(scheduler->size() !=0){
+    SchedulingDecision* scheduling_decision = scheduler->get_next_thread(event);
+    if(prev_thread != nullptr){
+      if(prev_thread->process != scheduling_decision->thread->process){
+        stats.dispatch_time+=process_switch_overhead;
+        add_event(new Event(Event::Type::PROCESS_DISPATCH_COMPLETED, event->time + process_switch_overhead, scheduling_decision->thread,scheduling_decision));
+      }
+      else{
+        stats.dispatch_time+=thread_switch_overhead;
+        add_event(new Event(Event::Type::THREAD_DISPATCH_COMPLETED, event->time+thread_switch_overhead, scheduling_decision->thread,scheduling_decision));
+      }
+    }
+    else{
+      stats.dispatch_time+=process_switch_overhead;
+      add_event(new Event(Event::Type::PROCESS_DISPATCH_COMPLETED, event->time + process_switch_overhead, scheduling_decision->thread,scheduling_decision));
+    }
+
+    active_thread = scheduling_decision->thread;
+  }
 
   cout << "event: DISPATCHER_INVOKED" << endl;
 }
@@ -258,5 +366,27 @@ Thread* Simulation::read_thread(istream& in, int tid, Process* process) {
 
 SystemStats Simulation::calculate_statistics() {
   // TODO: your code here (optional; feel free to modify code structure)
-  return SystemStats();
+  for(auto entry : processes) {
+    Process* process = entry.second;
+    Process::Type type = process->type;
+    for(Thread*thread : process->threads) {
+      stats.thread_counts[type]++;
+      stats.service_time += thread->service_time;
+      stats.io_time += thread->io_time;
+      stats.avg_thread_response_times[type] += thread-> response_time();
+      stats.avg_thread_turnaround_times[type] += thread-> turnaround_time();
+    }
+  }
+  stats.total_cpu_time = stats.service_time + stats.dispatch_time;
+  stats.total_idle_time = stats.total_time - stats.total_cpu_time;
+  stats.cpu_utilization = 100.0*stats.total_cpu_time / stats.total_time;
+  stats.cpu_efficiency = 100.0*stats.service_time / stats.total_time;
+
+  for(size_t i = Process::SYSTEM; i <= Process::BATCH; i++) {
+    if(stats.thread_counts[i] == 0) continue;
+    stats.avg_thread_response_times[i] /= stats.thread_counts[i];
+    stats.avg_thread_turnaround_times[i] /= stats.thread_counts[i];
+  }
+
+  return stats;
 }

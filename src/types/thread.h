@@ -89,15 +89,17 @@ struct Thread {
 
   size_t response_time() const {
     assert(current_state == EXIT);
-    // TODO: calculate real value
-    return 0;
+    // Implemented, TODO: calculate real value
+    return state_change_time-arrival_time;
+    //return 0;
   }
   
   
   size_t turnaround_time() const {
     assert(current_state == EXIT);
-    // TODO: calculate real value
-    return 0;
+    // Implemented, TODO: calculate real value
+    return end_time - arrival_time;
+    //return 0;
   }
 
   // TODO: threads in our simulation have behavior, so add helper methods here
@@ -106,5 +108,10 @@ struct Thread {
   // For example, I have methods for setting the thread to running, blocked, and
   // so forth. These take care of updating the state and times based on the
   // provided event.
+
+  void set_ready(int time);
+  void set_running(int time);
+  void set_blocked(int time);
+  void set_exit(int time);
 
 };
