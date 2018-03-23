@@ -24,5 +24,6 @@ public:
 
 private:
 
+	size_t size = 0;
   // TODO: add any instance variables you need
 };
