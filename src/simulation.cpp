@@ -85,7 +85,7 @@ void Simulation::handle_thread_arrived(const Event* event) {
   event->thread->set_ready(event->time);
   scheduler->enqueue(event, event->thread);
   if(active_thread == nullptr) {
-    add_event(new Event(Event::Type::DISPATCHER_INVOKED, event->time, nullptr));  
+    add_event(new Event(Event::Type::DISPATCHER_INVOKED, event->time, event->thread));  
   }
   // else{
   //   // Does not need to be implemented for FCFS. 
@@ -109,19 +109,19 @@ void Simulation::handle_thread_dispatch_completed(const Event* event) {
 
   event->thread->set_running(event->time);
 
-  int time_slice = event->scheduling_decision->time_slice;
-  int burst_length = event->thread->bursts.front()->length;
+  if (event->thread->start_time) active_thread = event->thread;
 
-  size_t event_time = (time_slice == -1) 
-    ? (event->time+burst_length) 
-    : event->time + time_slice;
+  size_t time_slice = event->scheduling_decision->time_slice;
+  size_t burst_length = event->thread->bursts.front()->length;
 
   if(time_slice < burst_length) {
-    event->thread->service_time += burst_length;
-    add_event(new Event(Event::Type::CPU_BURST_COMPLETED, event_time, event->thread));
+    event->thread->bursts.front()->length -= time_slice;
+    event->thread->service_time += time_slice;
+    add_event(new Event(Event::Type::THREAD_PREEMPTED, event->time+time_slice, event->thread));
   }
   else {
-    add_event(new Event(Event::Type::THREAD_PREEMPTED, event_time, event->thread));
+    event->thread->service_time += burst_length;
+    add_event(new Event(Event::Type::CPU_BURST_COMPLETED, event->time+burst_length, event->thread));
   }
 
   
@@ -143,25 +143,23 @@ void Simulation::handle_process_dispatch_completed(const Event* event) {
 
   event->thread->set_running(event->time);
 
-  int time_slice = event->scheduling_decision->time_slice;
-  int burst_length = event->thread->bursts.front()->length;
+  if (event->thread->start_time) active_thread = event->thread;
 
-  size_t event_time = (time_slice == -1) 
-    ? (event->time+burst_length) 
-    : event->time + time_slice;
-
-
+  size_t time_slice = event->scheduling_decision->time_slice;
+  size_t burst_length = event->thread->bursts.front()->length;
 
   if(time_slice < burst_length) {
-    event->thread->service_time += burst_length;
-    add_event(new Event(Event::Type::CPU_BURST_COMPLETED, event_time, event->thread));
+    event->thread->bursts.front()->length -= time_slice;
+    event->thread->service_time += time_slice;
+    add_event(new Event(Event::Type::THREAD_PREEMPTED, event->time+time_slice, event->thread));
   }
   else {
-    add_event(new Event(Event::Type::THREAD_PREEMPTED, event_time, event->thread));
+    event->thread->service_time += burst_length;
+    add_event(new Event(Event::Type::CPU_BURST_COMPLETED, event->time+burst_length, event->thread));
   }
 
 
-  cout << "event: THREAD_PROCESS_COMPLETED" << endl;
+  //cout << "event: THREAD_PROCESS_COMPLETED" << endl;
 }
 
 
@@ -180,22 +178,22 @@ void Simulation::handle_cpu_burst_completed(const Event* event) {
   // }
 
   event->thread->bursts.pop();
-  prev_thread = active_thread;
+  if(active_thread) prev_thread = active_thread;
   active_thread = nullptr;
 
-  if(event->thread->bursts.empty()){
-    add_event(new Event(Event::Type::THREAD_COMPLETED, event->time,event->thread));
+  Burst* burst;
+  if(event->thread->bursts.empty()) {
+    add_event(new Event(Event::Type::THREAD_COMPLETED, event->time, event->thread));
   }
-  else{
+  else {
+    burst = event->thread->bursts.front();
     event->thread->set_blocked(event->time);
-
-    Burst* temp = event->thread->bursts.front();
-    event->thread->io_time+=temp->length;
-    add_event(new Event(Event::Type::IO_BURST_COMPLETED,event->time+temp->length,event->thread));
+    event->thread->io_time += event->thread->bursts.front()->length;
+    add_event(new Event(Event::Type::IO_BURST_COMPLETED, event->time + burst->length, event->thread));
   }
   add_event(new Event(Event::Type::DISPATCHER_INVOKED, event->time, event->thread));
 
-  cout << "event: CPU_BURST_COMPLETED" << endl;
+  //cout << "event: CPU_BURST_COMPLETED" << endl;
 }
 
 
@@ -214,7 +212,7 @@ void Simulation::handle_io_burst_completed(const Event* event) {
     add_event(new Event(Event::Type::DISPATCHER_INVOKED, event->time, event->thread));
   }
 
-  cout << "event: IO_BURST_COMPLETED" << endl;
+  //cout << "event: IO_BURST_COMPLETED" << endl;
 }
 
 
@@ -226,7 +224,7 @@ void Simulation::handle_thread_completed(const Event* event) {
 
   //add_event(new Event(Event::DISPATCHER_INVOKED, event->time, nullptr));
 
-  cout << "event: THREAD_COMPLETED" << endl;
+  //cout << "event: THREAD_COMPLETED" << endl;
 }
 
 
@@ -238,12 +236,15 @@ void Simulation::handle_thread_preempted(const Event* event) {
   // thread dispatcher envoked;
 
   event->thread->set_ready(event->time);
-
   scheduler->enqueue(event, event->thread);
+  event->thread->preempted = true;
 
-  add_event(new Event(Event::DISPATCHER_INVOKED, event->time, nullptr));
-
-  cout << "event: THREAD_PREEMPTED" << endl;
+  if(active_thread) prev_thread = active_thread;
+  active_thread = nullptr;
+  if(!active_thread) {
+    add_event(new Event(Event::DISPATCHER_INVOKED, event->time, event->thread));
+  }
+  //cout << "event: THREAD_PREEMPTED" << endl;
 }
 
 
@@ -260,8 +261,11 @@ void Simulation::handle_dispatcher_invoked(const Event* event) {
   //   }
   // }
 
+
   if(scheduler->size() !=0){
     SchedulingDecision* scheduling_decision = scheduler->get_next_thread(event);
+    if(active_thread) prev_thread = active_thread;
+    active_thread = scheduling_decision->thread;
     if(prev_thread != nullptr){
       if(prev_thread->process != scheduling_decision->thread->process){
         stats.dispatch_time+=process_switch_overhead;
@@ -276,11 +280,11 @@ void Simulation::handle_dispatcher_invoked(const Event* event) {
       stats.dispatch_time+=process_switch_overhead;
       add_event(new Event(Event::Type::PROCESS_DISPATCH_COMPLETED, event->time + process_switch_overhead, scheduling_decision->thread,scheduling_decision));
     }
-
+    logger.print_verbose(event, scheduling_decision->thread, scheduling_decision->explanation);
     active_thread = scheduling_decision->thread;
   }
 
-  cout << "event: DISPATCHER_INVOKED" << endl;
+  //cout << "event: DISPATCHER_INVOKED" << endl;
 }
 
 

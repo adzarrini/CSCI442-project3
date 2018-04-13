@@ -3,7 +3,8 @@
 #include "types/event.h"
 #include "types/scheduling_decision.h"
 #include "types/thread.h"
-
+#include "types/process.h"
+#include <queue>
 
 /**
  * Represents a scheduling queue that gives threads of each type a different
@@ -25,5 +26,9 @@ public:
 
 private:
 
+	std::queue<Thread*> qSys;
+	std::queue<Thread*> qInt;
+	std::queue<Thread*> qNor;
+	std::queue<Thread*> qBa;
   // TODO: add any instance variables you need
 };

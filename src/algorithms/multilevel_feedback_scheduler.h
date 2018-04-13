@@ -3,7 +3,7 @@
 #include "types/event.h"
 #include "types/scheduling_decision.h"
 #include "types/thread.h"
-
+#include "types/process.h"
 
 /**
  * Represents a scheduling queue that demotes threads after being preempted.
@@ -24,5 +24,14 @@ public:
 
 private:
 
+	std::queue<Thread*> q0;
+	std::queue<Thread*> q1;
+	std::queue<Thread*> q2;
+	std::queue<Thread*> q3;
+
+	std::queue<Thread*> q4;
+	std::queue<Thread*> q5;
+	std::queue<Thread*> q6;
+	std::queue<Thread*> q7;
   // TODO: add any instance variables you need
 };

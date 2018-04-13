@@ -90,7 +90,7 @@ struct Thread {
   size_t response_time() const {
     assert(current_state == EXIT);
     // Implemented, TODO: calculate real value
-    return state_change_time-arrival_time;
+    return state_change_time - arrival_time;
     //return 0;
   }
   
@@ -101,6 +101,8 @@ struct Thread {
     return end_time - arrival_time;
     //return 0;
   }
+
+  bool preempted = false;
 
   // TODO: threads in our simulation have behavior, so add helper methods here
   //     that perform helpful logic (optional).

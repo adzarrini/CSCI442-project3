@@ -33,4 +33,5 @@ private:
   const size_t time_slice;
 
   // TODO: add any instance variables you need
+  std::queue<Thread*> q;
 };
