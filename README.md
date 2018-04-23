@@ -35,3 +35,8 @@ You might need to install Boost. I did it using HomeBrew via:
 
 You can also choose to rewrite the output methods (in src/util/logger.cpp) to
 not use Boost. That's a thing. ...that some people might do. Because... why not!
+
+# Graded
+ * final deliverable score: 180/180
+ * total score: 200/200
+
